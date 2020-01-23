@@ -1,6 +1,8 @@
 export interface CardConfig {
   type: string;
-  name?: string;
-  test_gui?: boolean;
   entity: string;
+}
+
+export interface Values {
+  temperature?: number;
 }
