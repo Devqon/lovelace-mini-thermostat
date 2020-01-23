@@ -17,7 +17,7 @@ A small lovelace card for controlling a thermostat
 HACS compatible
 
 ```yaml
-- url: /community_plugin/mini-thermostat.js
+- url: /community_plugin/lovelace-mini-thermostat/mini-thermostat.js
   type: module
 ```
 
