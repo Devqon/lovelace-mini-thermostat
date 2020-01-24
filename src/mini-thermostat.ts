@@ -30,7 +30,7 @@ const ICONS = {
   heat: 'hass:fire',
 };
 
-@customElement('mini-thermostat')
+@customElement('mini-thermostat-test')
 export class MiniThermostatCard extends LitElement {
   public static getStubConfig(): object {
     return {};
@@ -56,10 +56,10 @@ export class MiniThermostatCard extends LitElement {
 
   private _debounceTemperature = debounce(
     (values: Values) => {
-      if (!this.config?.entity || !this._hass) return;
+      if (!this.config!.entity || !this._hass) return;
 
       const details = {
-        entity_id: this.config.entity,
+        entity_id: this.config!.entity,
         ...values,
       };
       this._hass.callService('climate', 'set_temperature', details);
@@ -137,7 +137,12 @@ export class MiniThermostatCard extends LitElement {
     const targetTemperature = this._values.temperature;
 
     return html`
-      <ha-card class="no-header" tabindex="0" aria-label=${`MiniThermostat: ${this.config.entity}`}>
+      <ha-card
+        class="${this.config!.name ? 'with-header' : 'no-header'}"
+        tabindex="0"
+        aria-label=${`MiniThermostat: ${this.config.entity}`}
+        .header=${this.config!.name}
+      >
         <div class="flex-box">
           <div class="state">
             ${this._renderState()}
@@ -162,7 +167,7 @@ export class MiniThermostatCard extends LitElement {
   private _renderState() {
     const relativeState = this._getRelativeState(this.entity);
     const stateIcon = relativeState === 'under' ? 'heat' : 'default';
-    const currentTemperature = this.entity?.attributes.current_temperature;
+    const currentTemperature = this.entity!.attributes.current_temperature;
     return html`
       <paper-button @click="${() => this._showEntityMoreInfo(this.config!.entity)}" class="state-${relativeState}">
         <ha-icon icon="${ICONS[stateIcon]}"></ha-icon>
@@ -172,14 +177,14 @@ export class MiniThermostatCard extends LitElement {
   }
 
   private _renderListbox() {
-    if (!this.entity || !this.config?.dropdown) return '';
+    if (!this.entity || !this.config!.dropdown) return '';
 
-    const options = this.entity.attributes[this.config.dropdown];
-    const currentMode = this.config.dropdown === 'hvac_modes' ? this.entity.state : this.entity.attributes.preset_mode;
-    const name = this.config.dropdown === 'hvac_modes' ? 'hvac_mode' : 'preset_mode';
+    const options = this.entity.attributes[this.config!.dropdown];
+    const currentMode = this.config!.dropdown === 'hvac_modes' ? this.entity.state : this.entity.attributes.preset_mode;
+    const name = this.config!.dropdown === 'hvac_modes' ? 'hvac_mode' : 'preset_mode';
     if (!this.entity || !currentMode || !options) return '';
 
-    const localize = this.config.dropdown === 'hvac_modes' ? 'state.climate' : 'state_attributes.climate.preset_mode';
+    const localize = this.config!.dropdown === 'hvac_modes' ? 'state.climate' : 'state_attributes.climate.preset_mode';
     return html`
       <ha-paper-dropdown-menu no-label-float dynamic-align>
         <paper-listbox
