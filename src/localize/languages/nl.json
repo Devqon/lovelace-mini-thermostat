@@ -1,0 +1,10 @@
+{
+  "common": {
+    "version": "Versie",
+    "config": {
+      "invalid_configuration": "Invalid configuration",
+      "entity": "Niet-valide configuratie optie voor 'entity'",
+      "dropdown": "Niet-valide configuratie optie voor 'dropdown'"
+    }
+  }
+}
