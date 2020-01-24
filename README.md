@@ -23,11 +23,12 @@ HACS compatible
 
 ## Options
 
-| Name              | Type    | Requirement  | Description                                                                | Default             |
-| ----------------- | ------- | ------------ | -------------------------------------------------------------------------- | ------------------- |
-| type              | string  | **Required** | `custom:mini-thermostat`                                                   |                     |
-| entity            | string  | **Required** | Home Assistant climate entity ID.                                          |                     |
-| dropdown          | string  | **Optional** | Which dropdown to show. Current options are 'hvac_modes' or 'preset_modes' |                     |
+| Name     | Type   | Requirement  | Description                                                            | Default |
+| -------- | ------ | ------------ | ---------------------------------------------------------------------- | ------- |
+| type     | string | **Required** | `custom:mini-thermostat`                                               |         |
+| entity   | string | **Required** | Home Assistant climate entity ID.                                      |         |
+| name     | string | **Optional** | A name to display in the header                                        |         |
+| dropdown | string | **Optional** | 'hvac_modes', 'preset_modes'. Everything else will be rendered as name |         |
 
 ## Configuration (Installation throug HACS)
 
