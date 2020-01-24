@@ -56,10 +56,10 @@ export class MiniThermostatCard extends LitElement {
 
   private _debounceTemperature = debounce(
     (values: Values) => {
-      if (!this.config?.entity || !this._hass) return;
+      if (!this.config!.entity || !this._hass) return;
 
       const details = {
-        entity_id: this.config.entity,
+        entity_id: this.config!.entity,
         ...values,
       };
       this._hass.callService('climate', 'set_temperature', details);
@@ -109,11 +109,6 @@ export class MiniThermostatCard extends LitElement {
     if (!config || !config.entity) {
       throw new Error(localize('common.config.entity'));
     }
-    if (config.dropdown) {
-      if (config.dropdown !== 'hvac_modes' && config.dropdown !== 'preset_modes') {
-        throw new Error(localize('common.config.dropdown'));
-      }
-    }
   }
 
   protected shouldUpdate(changedProps: PropertyValues): boolean {
@@ -125,8 +120,7 @@ export class MiniThermostatCard extends LitElement {
       return html``;
     }
 
-    const stateObj = this.entity;
-    if (!stateObj) {
+    if (!this.entity) {
       return html`
         <ha-card>
           <div class="warning">${localize('common.config.not-available')}</div>
@@ -137,13 +131,18 @@ export class MiniThermostatCard extends LitElement {
     const targetTemperature = this._values.temperature;
 
     return html`
-      <ha-card class="no-header" tabindex="0" aria-label=${`MiniThermostat: ${this.config.entity}`}>
+      <ha-card
+        class="${this.config!.name ? 'with-header' : 'no-header'}"
+        tabindex="0"
+        aria-label=${`MiniThermostat: ${this.config.entity}`}
+        .header=${this.config!.name}
+      >
         <div class="flex-box">
           <div class="state">
             ${this._renderState()}
           </div>
           <div class="container-modes">
-            ${this._renderListbox()}
+            ${this._renderDropdown()}
           </div>
           <div class="actions flex-box">
             ${this._renderTemperatureChangeButton('up')}
@@ -162,7 +161,7 @@ export class MiniThermostatCard extends LitElement {
   private _renderState() {
     const relativeState = this._getRelativeState(this.entity);
     const stateIcon = relativeState === 'under' ? 'heat' : 'default';
-    const currentTemperature = this.entity?.attributes.current_temperature;
+    const currentTemperature = this.entity!.attributes.current_temperature;
     return html`
       <paper-button @click="${() => this._showEntityMoreInfo(this.config!.entity)}" class="state-${relativeState}">
         <ha-icon icon="${ICONS[stateIcon]}"></ha-icon>
@@ -171,27 +170,58 @@ export class MiniThermostatCard extends LitElement {
     `;
   }
 
-  private _renderListbox() {
-    if (!this.entity || !this.config?.dropdown) return '';
+  private _renderDropdown() {
+    if (!this.config!.dropdown) return '';
 
-    const options = this.entity.attributes[this.config.dropdown];
-    const currentMode = this.config.dropdown === 'hvac_modes' ? this.entity.state : this.entity.attributes.preset_mode;
-    const name = this.config.dropdown === 'hvac_modes' ? 'hvac_mode' : 'preset_mode';
-    if (!this.entity || !currentMode || !options) return '';
+    if (this.config!.dropdown === 'hvac_modes') {
+      return this._renderHvacModes();
+    } else if (this.config!.dropdown === 'preset_modes') {
+      return this._renderPresetModes();
+    } else {
+      // return what else is configured, for example a name
+      return html`
+        <paper-button @click=${() => this._showEntityMoreInfo(this.config!.entity)}>
+          ${this.config!.dropdown}
+        </paper-button>
+      `;
+    }
+  }
 
-    const localize = this.config.dropdown === 'hvac_modes' ? 'state.climate' : 'state_attributes.climate.preset_mode';
+  private _renderHvacModes() {
+    if (!this.entity!.attributes.hvac_modes) return '';
+
+    const modes = this.entity!.attributes.hvac_modes;
+    const currentMode = this.entity!.state;
+    const localizationKey = 'state.climate';
+
+    return this._renderListbox(modes, currentMode, localizationKey, 'hvac_mode');
+  }
+
+  private _renderPresetModes() {
+    if (!this.entity!.attributes.preset_mode) return '';
+
+    if (!this.entity!.attributes.preset_modes) return this.entity!.attributes.preset_mode;
+
+    const modes = this.entity!.attributes.preset_modes;
+    const currentMode = this.entity!.attributes.preset_mode;
+    const localizationKey = 'state_attributes.climate.preset_mode';
+
+    return this._renderListbox(modes, currentMode, localizationKey, 'preset_mode');
+  }
+
+  private _renderListbox(options: string[], current: string, localizationKey: string, service: string) {
     return html`
       <ha-paper-dropdown-menu no-label-float dynamic-align>
         <paper-listbox
           slot="dropdown-content"
           attr-for-selected="item-name"
-          .selected=${currentMode}
-          @selected-changed=${ev => this._handleModeChanged(ev, name)}
+          .selected=${current}
+          @selected-changed=${ev => this._handleModeChanged(ev, service)}
         >
           ${options.map(
-            mode => html`
-              <paper-item item-name=${mode}>
-                ${this._hass!.localize(`${localize}.${mode}`) || mode}
+            option => html`
+              <paper-item item-name=${option}>
+                ${this._hass!.localize(`${localizationKey}.${option}`) || option}
               </paper-item>
             `,
           )}
@@ -282,6 +312,8 @@ export class MiniThermostatCard extends LitElement {
       }
       .container-modes {
         max-width: 150px;
+        display: flex;
+        align-items: center;
       }
       .actions {
         display: flex;

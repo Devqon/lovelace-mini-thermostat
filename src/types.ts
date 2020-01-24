@@ -1,7 +1,8 @@
 export interface CardConfig {
   type: string;
   entity: string;
-  dropdown?: 'hvac_modes' | 'preset_modes';
+  name?: string;
+  dropdown?: 'hvac_modes' | 'preset_modes' | string;
 }
 
 export interface Values {
