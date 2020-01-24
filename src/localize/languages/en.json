@@ -1,7 +1,11 @@
 {
   "common": {
     "version": "Version",
-    "invalid_configuration": "Invalid configuration",
-    "show_warning": "Show Warning"
+    "config": {
+      "invalid_configuration": "Invalid configuration",
+      "not-available": "Entity not available",
+      "entity": "Invalid configuration option for 'entity'",
+      "dropdown": "Invalid configuration option for 'dropdown'"
+    }
   }
 }

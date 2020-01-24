@@ -1,7 +1,7 @@
 {
-  "name": "mini-thermostat-card",
-  "version": "0.0.2",
-  "description": "Mini Thermostat card",
+  "name": "lovelace-mini-thermostat",
+  "version": "0.0.3",
+  "description": "Mini Thermostat card for Lovelace",
   "keywords": [
     "home-assistant",
     "homeassistant",

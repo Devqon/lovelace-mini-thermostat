@@ -1,5 +1,5 @@
 {
-    "name": "Mini Thermostat Card",
+    "name": "Mini Thermostat",
     "render_readme": true,
-    "filename": "mini-thermostat-card.js"
+    "filename": "mini-thermostat.js"
 }
