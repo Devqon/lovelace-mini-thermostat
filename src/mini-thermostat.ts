@@ -285,7 +285,7 @@ export class MiniThermostatCard extends LitElement {
               : button.name
               ? button.name
               : ''}
-            ${button.temperature} ${this.unit}
+            ${this._toDisplayTemperature(button.temperature)}
           </paper-button>
         `,
       )}
