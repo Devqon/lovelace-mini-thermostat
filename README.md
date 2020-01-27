@@ -23,18 +23,59 @@ HACS compatible
 
 ## Options
 
-| Name     | Type   | Requirement  | Description                                                            | Default |
-| -------- | ------ | ------------ | ---------------------------------------------------------------------- | ------- |
-| type     | string | **Required** | `custom:mini-thermostat`                                               |         |
-| entity   | string | **Required** | Home Assistant climate entity ID.                                      |         |
-| name     | string | **Optional** | A name to display in the header                                        |         |
-| dropdown | string | **Optional** | 'hvac_modes', 'preset_modes'. Everything else will be rendered as name |         |
+### Card options
+
+| Name     | Type   | Requirement  | Description | Default |
+| ---- | ---- | -------- | ----------- | ------- |
+| type     | string | **Required** | `custom:mini-thermostat` |
+| entity   | string | **Required** | Home Assistant climate entity ID. |
+| name     | string | **Optional** | A name to display in the header |
+| layout   | Layout | **Optional** | See [Layout Object](#layout-object) |
+
+### Layout Object
+| Name | Type | Required | Description | Default |
+| ---- | ---- | -------- | ----------- | ------- |
+| dropdown | string | **Optional** | `hvac_modes` or `preset_modes` |
+| name | string | **Optional** | Render a name in the middle of the card |
+| preset_buttons | List | **Optional** | See [Preset Button Object](#preset-button-object) |
+
+### Preset Button Object
+| Name | Type | Required | Description | Default |
+| ---- | ---- | -------- | ----------- | ------- |
+| temperature | number | **Required** | The target temperature |
+| icon | string | **Optional** | An optional icon to display in the preset button |
+| name | string | **Optional** | An optional name to display in the preset button |
 
 ## Configuration (Installation throug HACS)
 
 ```yaml
 - type: custom:mini-thermostat
   entity: climate.main_thermostat
+```
+
+## Examples
+
+```yaml
+- type: custom:mini-thermostat
+  entity: climate.main_thermostat
+  layout:
+    dropdown: 'hvac_modes'
+
+- type: custom:mini-thermostat
+  entity: climate.main_thermostat
+  layout:
+    name: 'Main Thermostat'
+
+- type: custom:mini-thermostat
+  entity: climate.main_thermostat
+  layout:
+    preset_buttons:
+      - temperature: 16
+        name: ECO
+      - temperature: 20
+        name: Default
+      - temperature: 22
+        icon: hass:fire
 ```
 
 [commits-shield]: https://img.shields.io/github/commit-activity/y/Devqon/lovelace-mini-thermostat.svg?style=for-the-badge
