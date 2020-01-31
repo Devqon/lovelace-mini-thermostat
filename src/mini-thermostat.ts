@@ -8,6 +8,7 @@ import {
   PropertyValues,
   PropertyDeclarations,
 } from 'lit-element';
+import { classMap } from 'lit-html/directives/class-map';
 import { HomeAssistant } from 'custom-card-helpers';
 import { HassEntity } from 'home-assistant-js-websocket';
 import debounce from 'debounce-fn';
@@ -28,6 +29,8 @@ const UPDATE_PROPS = ['_values', 'entity', '_updating', 'unit'];
 const ICONS = {
   default: 'hass:thermometer',
   heat: 'hass:fire',
+  up: 'mdi:chevron-up',
+  down: 'mdi:chevron-down',
 };
 
 @customElement('mini-thermostat')
@@ -117,15 +120,29 @@ export class MiniThermostatCard extends LitElement {
       }
       if (config.layout.preset_buttons) {
         if (!Array.isArray(config.layout.preset_buttons)) {
-          throw new Error('preset_buttons must be a list');
+          if (config.layout.preset_buttons !== 'hvac_modes' && config.layout.preset_buttons !== 'preset_modes')
+            throw new Error('Invalid configuration for preset_buttons');
+        } else {
+          config.layout.preset_buttons.forEach(button => {
+            if (typeof button.temperature !== 'number') {
+              throw new Error('Temperature should be a number');
+            }
+          });
         }
-        config.layout.preset_buttons.forEach(button => {
-          if (typeof button.temperature !== 'number') {
-            throw new Error('Temperature should be a number');
-          }
-        });
       }
     }
+  }
+
+  private _getIcon(name: string) {
+    if (this.config?.icons && this.config.icons[name]) {
+      return this.config.icons[name];
+    }
+    return ICONS[name] || name;
+  }
+
+  // config helpers
+  private shouldRenderUpDown() {
+    return this.config!.layout?.up_down !== false;
   }
 
   protected shouldUpdate(changedProps: PropertyValues): boolean {
@@ -149,7 +166,8 @@ export class MiniThermostatCard extends LitElement {
 
     return html`
       <ha-card
-        class="${this.config!.name ? 'with-header' : 'no-header'}"
+        class="${this._computeClasses()}"
+        .grouped="${this.config!.layout?.grouped}"
         tabindex="0"
         aria-label=${`MiniThermostat: ${this.config.entity}`}
         .header=${this.config!.name}
@@ -161,15 +179,19 @@ export class MiniThermostatCard extends LitElement {
           <div class="container-middle">
             ${this._renderMiddle()}
           </div>
-          <div class="actions flex-box">
-            ${this._renderTemperatureChangeButton('up')}
-            <paper-button @click="${() => this._showEntityMoreInfo()}" class="action">
-              <span class="${this._updating ? 'updating' : ''}">
-                ${this._toDisplayTemperature(targetTemperature)}
-              </span>
-            </paper-button>
-            ${this._renderTemperatureChangeButton('down')}
-          </div>
+          ${this.shouldRenderUpDown()
+            ? html`
+                <div class="actions flex-box">
+                  ${this._renderTemperatureChangeButton('up')}
+                  <mwc-button @click="${() => this._showEntityMoreInfo()}">
+                    <span class="${this._updating ? 'updating' : ''}">
+                      ${this._toDisplayTemperature(targetTemperature)}
+                    </span>
+                  </mwc-button>
+                  ${this._renderTemperatureChangeButton('down')}
+                </div>
+              `
+            : ''}
         </div>
       </ha-card>
     `;
@@ -180,10 +202,10 @@ export class MiniThermostatCard extends LitElement {
     const stateIcon = relativeState === 'under' ? 'heat' : 'default';
     const currentTemperature = this.entity!.attributes.current_temperature;
     return html`
-      <paper-button @click="${() => this._showEntityMoreInfo()}" class="state-${relativeState}">
-        <ha-icon icon="${ICONS[stateIcon]}"></ha-icon>
+      <mwc-button @click="${() => this._showEntityMoreInfo()}" class="state-${relativeState}">
+        <ha-icon icon="${this._getIcon(stateIcon)}"></ha-icon>
         ${this._toDisplayTemperature(currentTemperature)}
-      </paper-button>
+      </mwc-button>
     `;
   }
 
@@ -222,9 +244,9 @@ export class MiniThermostatCard extends LitElement {
 
   private _renderName(name: string) {
     return html`
-      <paper-button @click=${() => this._showEntityMoreInfo()}>
+      <mwc-button @click=${() => this._showEntityMoreInfo()}>
         ${name}
-      </paper-button>
+      </mwc-button>
     `;
   }
 
@@ -256,8 +278,8 @@ export class MiniThermostatCard extends LitElement {
         <paper-listbox
           slot="dropdown-content"
           attr-for-selected="item-name"
-          .selected=${current}
-          @selected-changed=${ev => this._handleModeChanged(ev, service, current)}
+          .selected="${current}"
+          @selected-changed="${ev => this._handleModeChanged(ev, service, current)}"
         >
           ${options.map(
             option => html`
@@ -271,34 +293,81 @@ export class MiniThermostatCard extends LitElement {
     `;
   }
 
-  private _renderPresetButtons() {
-    if (!this.config!.layout || !this.config!.layout.preset_buttons) return '';
+  private _renderPresetButtons({ config, entity } = this) {
+    if (!config || !config.layout || !config!.layout.preset_buttons || !entity) return '';
 
-    const presetButtonsHtml = html`
-      ${this.config!.layout.preset_buttons.map(
-        button => html`
-          <paper-button @click=${() => this._setTemperature(button.temperature)}>
-            ${button.icon
-              ? html`
-                  <ha-icon icon="${button.icon}"></ha-icon>
-                `
-              : button.name
-              ? button.name
-              : ''}
-            ${this._toDisplayTemperature(button.temperature)}
-          </paper-button>
-        `,
-      )}
+    let presetButtonsHtml;
+    if (Array.isArray(config.layout.preset_buttons)) {
+      presetButtonsHtml = html`
+        ${config.layout.preset_buttons.map(button =>
+          this._renderSetTemperatureButton(button.temperature, button.icon, button.name),
+        )}
+      `;
+      return presetButtonsHtml;
+    } else {
+      if (config.layout.preset_buttons === 'preset_modes') {
+        return html`
+          ${entity.attributes.preset_modes.map(mode => this._renderSetPresetModeButton(mode))}
+        `;
+      } else if (config.layout.preset_buttons === 'hvac_modes') {
+        return html`
+          ${entity.attributes.hvac_modes.map(mode => this._renderSetHvacModeButton(mode))}
+        `;
+      }
+    }
+  }
+
+  private _renderSetTemperatureButton(temperature: number, icon?: string, name?: string) {
+    if (icon && !name) {
+      return html`
+        <paper-icon-button
+          title="Set temperature to ${temperature}"
+          class="set-temperature"
+          icon="${this._getIcon(icon)}"
+        >
+        </paper-icon-button>
+      `;
+    } else {
+      return html`
+        <mwc-button @click="${() => this._setTemperature(temperature)}">
+          ${icon
+            ? html`
+                <ha-icon icon="${this._getIcon(icon)}"></ha-icon>
+              `
+            : name
+            ? name
+            : ''}
+          ${this._toDisplayTemperature(temperature)}
+        </mwc-button>
+      `;
+    }
+  }
+
+  private _renderSetHvacModeButton(mode: string) {
+    return html`
+      <mwc-button @click="${() => this._setMode('hvac_mode', mode)}">
+        ${this._hass!.localize(`state.climate.${mode}`) || mode}
+      </mwc-button>
     `;
-    return presetButtonsHtml;
+  }
+
+  private _renderSetPresetModeButton(mode: string) {
+    return html`
+      <mwc-button @click="${() => this._setMode('preset_mode', mode)}">
+        ${this._hass!.localize(`state_attributes.climate.preset_mode.${mode}`) || mode}
+      </mwc-button>
+    `;
   }
 
   private _renderTemperatureChangeButton(direction: 'up' | 'down') {
     const change = direction === 'up' ? 0.5 : -0.5;
     return html`
-      <paper-button @click="${() => this._changeTemperature(change)}" class="action">
-        <ha-icon icon="mdi:chevron-${direction}"></ha-icon>
-      </paper-button>
+      <paper-icon-button
+        title="Temperature up"
+        class="change-arrow"
+        icon="${this._getIcon(`${direction}`)}"
+        @click="${() => this._changeTemperature(change)}" class="action">
+      </<paper-icon-button>
     `;
   }
 
@@ -328,14 +397,18 @@ export class MiniThermostatCard extends LitElement {
 
   private _handleModeChanged(ev: CustomEvent, name: string, current: string): void {
     const newVal = ev.detail.value;
+    // prevent heating while in idle by checking for current
     if (newVal && newVal !== current) {
-      // prevent heating while in idle by checking for current
-      const serviceData = {
-        entity_id: this.config!.entity,
-        [name]: newVal,
-      };
-      this._hass!.callService('climate', `set_${name}`, serviceData);
+      this._setMode(name, newVal);
     }
+  }
+
+  private _setMode(name: string, value: string) {
+    const serviceData = {
+      entity_id: this.config!.entity,
+      [name]: value,
+    };
+    this._hass!.callService('climate', `set_${name}`, serviceData);
   }
 
   private _getRelativeState(stateObj): string {
@@ -351,16 +424,26 @@ export class MiniThermostatCard extends LitElement {
     return 'neutral';
   }
 
-  private _showEntityMoreInfo(): void {
+  private _showEntityMoreInfo({ entity } = this.config!): void {
     const event = new Event('hass-more-info', { bubbles: true, cancelable: false, composed: true });
-    (event as any).detail = { entityId: this.config!.entity };
+    (event as any).detail = { entityId: entity };
     this.dispatchEvent(event);
+  }
+
+  private _computeClasses({ config } = this) {
+    if (!config) return '';
+    const hasHeader = !!config.name;
+    return classMap({
+      grouped: config.layout?.grouped || false,
+      'with-header': hasHeader,
+      'no-header': !hasHeader,
+    });
   }
 
   static get styles(): CSSResult {
     return css`
       :host {
-        --minith-default-spacing: 4px;
+        --minith-default-spacing: 2px;
 
         --minith-default-inactive-color: inherit;
         --minith-default-active-color: var(--paper-item-icon-color, #12d289);
@@ -385,18 +468,27 @@ export class MiniThermostatCard extends LitElement {
       }
       .actions {
         display: flex;
+        justify-content: flex-end;
+      }
+      .actions paper-icon-button {
+        height: 100%;
+      }
+      .actions mwc-button {
+        width: 30px;
+        display: flex;
+        justify-content: center;
       }
       .updating {
         color: var(--minith-warning-color, var(--minith-default-warning-color));
       }
-      paper-button {
+      mwc-button {
         cursor: pointer;
         padding: 8px;
         position: relative;
         display: inline-flex;
         align-items: center;
       }
-      paper-button.action {
+      mwc-button.action {
         min-width: 30px;
         display: flex;
         justify-content: center;
