@@ -31,13 +31,18 @@ HACS compatible
 | entity   | string | **Required** | Home Assistant climate entity ID. |
 | name     | string | **Optional** | A name to display in the header |
 | layout   | Layout | **Optional** | See [Layout Object](#layout-object) |
+| icons    | Object | **Optional** | Mapping for overriding icons |
+| labels   | Object | **Optional** | Mapping for overriding labels |
 
 ### Layout Object
 | Name | Type | Required | Description | Default |
 | ---- | ---- | -------- | ----------- | ------- |
+| grouped | boolean | **Optional** | Set true for smaller card (used for entities for example) | false |
+| tiny | boolean | **Optional** | Set true for even tinier card (sets padding on the card to zero) | false |
 | dropdown | string | **Optional** | `hvac_modes` or `preset_modes` |
 | name | string | **Optional** | Render a name in the middle of the card |
-| preset_buttons | List | **Optional** | See [Preset Button Object](#preset-button-object) |
+| preset_buttons | List or string | **Optional** | `hvac_modes` or `preset_modes`. Can also supply custom buttons; See [Preset Button Object](#preset-button-object) |
+| up_down | boolean | **Optional** | Set to false to hide the up/down buttons |
 
 ### Preset Button Object
 | Name | Type | Required | Description | Default |
@@ -45,6 +50,7 @@ HACS compatible
 | temperature | number | **Required** | The target temperature |
 | icon | string | **Optional** | An optional icon to display in the preset button |
 | name | string | **Optional** | An optional name to display in the preset button |
+| showTemperature | boolean | **Optional** | Set to true to display the temperature in the button | false |
 
 ## Configuration (Installation throug HACS)
 
@@ -76,6 +82,21 @@ HACS compatible
         name: Default
       - temperature: 22
         icon: hass:fire
+
+- type: entities
+  entities:
+    - climate.climate_one
+      type: custom:mini-thermostat
+      grouped: true
+      layout:
+        name: One
+        dropdown: 'hvac_modes'
+        up_down: false
+    - climate.two
+      type: custom:mini-thermostat
+      grouped: true
+      layout:
+        name: Two
 ```
 
 [commits-shield]: https://img.shields.io/github/commit-activity/y/Devqon/lovelace-mini-thermostat.svg?style=for-the-badge

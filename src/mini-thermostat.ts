@@ -452,7 +452,7 @@ export class MiniThermostatCard extends LitElement {
       grouped: config.layout?.grouped || false,
       'with-header': hasHeader,
       'no-header': !hasHeader,
-      tiny: config.layout?.tiny || false
+      tiny: config.layout?.tiny || false,
     });
   }
 
