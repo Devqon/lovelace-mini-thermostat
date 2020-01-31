@@ -13,7 +13,7 @@ import { HomeAssistant } from 'custom-card-helpers';
 import { HassEntity } from 'home-assistant-js-websocket';
 import debounce from 'debounce-fn';
 
-import { CardConfig, Values } from './types';
+import { CardConfig, Values, PresetButtonConfig } from './types';
 import { CARD_VERSION } from './const';
 
 import { localize } from './localize/localize';
@@ -140,6 +140,13 @@ export class MiniThermostatCard extends LitElement {
     return ICONS[name] || name;
   }
 
+  private _getLabel(name: string, fallback?: string) {
+    if (this.config?.labels && this.config.labels[name]) {
+      return this.config.labels[name];
+    }
+    return this._hass?.localize(name) || fallback;
+  }
+
   // config helpers
   private shouldRenderUpDown() {
     return this.config!.layout?.up_down !== false;
@@ -162,8 +169,6 @@ export class MiniThermostatCard extends LitElement {
       `;
     }
 
-    const targetTemperature = this._values.temperature;
-
     return html`
       <ha-card
         class="${this._computeClasses()}"
@@ -179,19 +184,7 @@ export class MiniThermostatCard extends LitElement {
           <div class="container-middle">
             ${this._renderMiddle()}
           </div>
-          ${this.shouldRenderUpDown()
-            ? html`
-                <div class="actions flex-box">
-                  ${this._renderTemperatureChangeButton('up')}
-                  <mwc-button @click="${() => this._showEntityMoreInfo()}">
-                    <span class="${this._updating ? 'updating' : ''}">
-                      ${this._toDisplayTemperature(targetTemperature)}
-                    </span>
-                  </mwc-button>
-                  ${this._renderTemperatureChangeButton('down')}
-                </div>
-              `
-            : ''}
+          ${this._renderEnd()}
         </div>
       </ha-card>
     `;
@@ -202,7 +195,7 @@ export class MiniThermostatCard extends LitElement {
     const stateIcon = relativeState === 'under' ? 'heat' : 'default';
     const currentTemperature = this.entity!.attributes.current_temperature;
     return html`
-      <mwc-button @click="${() => this._showEntityMoreInfo()}" class="state-${relativeState}">
+      <mwc-button dense @click="${() => this._showEntityMoreInfo()}" class="state-${relativeState}">
         <ha-icon icon="${this._getIcon(stateIcon)}"></ha-icon>
         ${this._toDisplayTemperature(currentTemperature)}
       </mwc-button>
@@ -244,7 +237,7 @@ export class MiniThermostatCard extends LitElement {
 
   private _renderName(name: string) {
     return html`
-      <mwc-button @click=${() => this._showEntityMoreInfo()}>
+      <mwc-button dense @click=${() => this._showEntityMoreInfo()}>
         ${name}
       </mwc-button>
     `;
@@ -284,7 +277,7 @@ export class MiniThermostatCard extends LitElement {
           ${options.map(
             option => html`
               <paper-item item-name=${option}>
-                ${this._hass!.localize(`${localizationKey}.${option}`) || option}
+                ${this._getLabel(`${localizationKey}.${option}`, option)}
               </paper-item>
             `,
           )}
@@ -299,9 +292,7 @@ export class MiniThermostatCard extends LitElement {
     let presetButtonsHtml;
     if (Array.isArray(config.layout.preset_buttons)) {
       presetButtonsHtml = html`
-        ${config.layout.preset_buttons.map(button =>
-          this._renderSetTemperatureButton(button.temperature, button.icon, button.name),
-        )}
+        ${config.layout.preset_buttons.map(button => this._renderSetTemperatureButton(button))}
       `;
       return presetButtonsHtml;
     } else {
@@ -317,44 +308,51 @@ export class MiniThermostatCard extends LitElement {
     }
   }
 
-  private _renderSetTemperatureButton(temperature: number, icon?: string, name?: string) {
-    if (icon && !name) {
-      return html`
-        <paper-icon-button
-          title="Set temperature to ${temperature}"
-          class="set-temperature"
-          icon="${this._getIcon(icon)}"
-        >
-        </paper-icon-button>
-      `;
-    } else {
-      return html`
-        <mwc-button @click="${() => this._setTemperature(temperature)}">
-          ${icon
-            ? html`
-                <ha-icon icon="${this._getIcon(icon)}"></ha-icon>
-              `
-            : name
-            ? name
-            : ''}
-          ${this._toDisplayTemperature(temperature)}
-        </mwc-button>
-      `;
-    }
+  private _renderSetTemperatureButton(button: PresetButtonConfig) {
+    const isCurrentTargetTemperature = this.entity!.attributes.temperature === button.temperature;
+    return html`
+      <mwc-button
+        @click="${() => this._setTemperature(button.temperature)}"
+        dense
+        .raised="${isCurrentTargetTemperature}"
+        .outlined="${!isCurrentTargetTemperature}"
+      >
+        ${button.icon
+          ? html`
+              <ha-icon icon="${this._getIcon(button.icon)}"></ha-icon>
+            `
+          : button.name
+          ? button.name
+          : ''}
+        ${button.show_temperature ? this._toDisplayTemperature(button.temperature) : ''}
+      </mwc-button>
+    `;
   }
 
   private _renderSetHvacModeButton(mode: string) {
+    const isCurrentHvacMode = this.entity!.state === mode;
     return html`
-      <mwc-button @click="${() => this._setMode('hvac_mode', mode)}">
-        ${this._hass!.localize(`state.climate.${mode}`) || mode}
+      <mwc-button
+        .raised="${isCurrentHvacMode}"
+        .outlined="${!isCurrentHvacMode}"
+        dense
+        @click="${() => this._setMode('hvac_mode', mode)}"
+      >
+        ${this._getLabel(`state.climate.${mode}`, mode)}
       </mwc-button>
     `;
   }
 
   private _renderSetPresetModeButton(mode: string) {
+    const isCurrentPresetMode = this.entity!.attributes.preset_mode === mode;
     return html`
-      <mwc-button @click="${() => this._setMode('preset_mode', mode)}">
-        ${this._hass!.localize(`state_attributes.climate.preset_mode.${mode}`) || mode}
+      <mwc-button
+        .raised="${isCurrentPresetMode}"
+        .outlined="${!isCurrentPresetMode}"
+        dense
+        @click="${() => this._setMode('preset_mode', mode)}"
+      >
+        ${this._getLabel(`state_attributes.climate.preset_mode.${mode}`, mode)}
       </mwc-button>
     `;
   }
@@ -369,6 +367,23 @@ export class MiniThermostatCard extends LitElement {
         @click="${() => this._changeTemperature(change)}" class="action">
       </<paper-icon-button>
     `;
+  }
+
+  private _renderEnd({ temperature: targetTemperature } = this._values) {
+    const upDown = this.shouldRenderUpDown();
+    return upDown
+      ? html`
+          <div class="actions flex-box">
+            ${this._renderTemperatureChangeButton('up')}
+            <mwc-button dense @click="${() => this._showEntityMoreInfo()}">
+              <span class="${this._updating ? 'updating' : ''}">
+                ${this._toDisplayTemperature(targetTemperature)}
+              </span>
+            </mwc-button>
+            ${this._renderTemperatureChangeButton('down')}
+          </div>
+        `
+      : '';
   }
 
   private _toDisplayTemperature(temperature?: number, fallback = 'N/A'): string {
@@ -437,6 +452,7 @@ export class MiniThermostatCard extends LitElement {
       grouped: config.layout?.grouped || false,
       'with-header': hasHeader,
       'no-header': !hasHeader,
+      tiny: config.layout?.tiny || false
     });
   }
 
@@ -453,13 +469,15 @@ export class MiniThermostatCard extends LitElement {
         padding: calc(var(--minith-spacing, var(--minith-default-spacing)) * 4) 0;
       }
       ha-card.with-header .card-header {
-          padding: 0 24px;
+        padding: 0 24px;
       }
       ha-card.grouped {
         box-shadow: none;
+        padding: 0;
       }
       ha-card.grouped .state {
         padding-left: 0;
+        width: 104px;
       }
       ha-card.grouped .state mwc-button {
         padding-left: 0;
@@ -468,12 +486,12 @@ export class MiniThermostatCard extends LitElement {
         padding-top: 0;
         padding-bottom: 0;
       }
+      ha-card.tiny {
+        padding: 0;
+      }
       .flex-box {
         display: flex;
         justify-content: space-between;
-      }
-      .state {
-        padding-left: 10px;
       }
       .container-middle {
         display: flex;
