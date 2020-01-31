@@ -30,7 +30,7 @@ const ICONS = {
   default: 'hass:thermometer',
   heat: 'hass:fire',
   up: 'mdi:chevron-up',
-  down: 'mdi:chevron-down'
+  down: 'mdi:chevron-down',
 };
 
 @customElement('mini-thermostat')
@@ -323,7 +323,8 @@ export class MiniThermostatCard extends LitElement {
         <paper-icon-button
           title="Set temperature to ${temperature}"
           class="set-temperature"
-          icon="${this._getIcon(icon)}">
+          icon="${this._getIcon(icon)}"
+        >
         </paper-icon-button>
       `;
     } else {
@@ -433,9 +434,9 @@ export class MiniThermostatCard extends LitElement {
     if (!config) return '';
     const hasHeader = !!config.name;
     return classMap({
-      'grouped': config.layout?.grouped || false,
+      grouped: config.layout?.grouped || false,
       'with-header': hasHeader,
-      'no-header': !hasHeader
+      'no-header': !hasHeader,
     });
   }
 
