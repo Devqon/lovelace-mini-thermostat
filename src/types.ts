@@ -3,12 +3,14 @@ export interface CardConfig {
   entity: string;
   name?: string;
   layout?: CardLayoutConfig;
+  icons?: { [key: string]: string };
 }
 
 export interface CardLayoutConfig {
   dropdown?: 'hvac_modes' | 'preset_modes';
   name?: string;
-  preset_buttons?: PresetButtonConfig[];
+  preset_buttons?: PresetButtonConfig[] | 'hvac_modes' | 'preset_modes';
+  up_down?: boolean;
 }
 
 export interface PresetButtonConfig {
