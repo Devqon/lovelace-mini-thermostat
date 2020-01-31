@@ -452,6 +452,22 @@ export class MiniThermostatCard extends LitElement {
       ha-card.no-header {
         padding: calc(var(--minith-spacing, var(--minith-default-spacing)) * 4) 0;
       }
+      ha-card.with-header .card-header {
+          padding: 0 24px;
+      }
+      ha-card.grouped {
+        box-shadow: none;
+      }
+      ha-card.grouped .state {
+        padding-left: 0;
+      }
+      ha-card.grouped .state mwc-button {
+        padding-left: 0;
+      }
+      ha-card.grouped mwc-button {
+        padding-top: 0;
+        padding-bottom: 0;
+      }
       .flex-box {
         display: flex;
         justify-content: space-between;
