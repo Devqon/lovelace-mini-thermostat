@@ -7,6 +7,7 @@ export interface CardConfig {
 }
 
 export interface CardLayoutConfig {
+  grouped?: boolean;
   dropdown?: 'hvac_modes' | 'preset_modes';
   name?: string;
   preset_buttons?: PresetButtonConfig[] | 'hvac_modes' | 'preset_modes';
