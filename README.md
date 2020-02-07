@@ -33,6 +33,7 @@ HACS compatible
 | layout   | Layout | **Optional** | See [Layout Object](#layout-object) |
 | icons    | Object | **Optional** | Mapping for overriding icons |
 | labels   | Object | **Optional** | Mapping for overriding labels |
+| step_size | number | **Optional** | Stepsize for the up/down buttons | 0.5 |
 
 ### Layout Object
 | Name | Type | Required | Description | Default |
@@ -47,10 +48,19 @@ HACS compatible
 ### Preset Button Object
 | Name | Type | Required | Description | Default |
 | ---- | ---- | -------- | ----------- | ------- |
-| temperature | number | **Required** | The target temperature |
+| type | string | **Required** | `temperature`, `hvac_mode`, `preset_mode`, `script` or `service` |
+| data | Object | **Required** | See [Data Object](#data-object) |
 | icon | string | **Optional** | An optional icon to display in the preset button |
-| name | string | **Optional** | An optional name to display in the preset button |
-| showTemperature | boolean | **Optional** | Set to true to display the temperature in the button | false |
+| label | string | **Optional** | An optional label to display in the preset button |
+| entity | string | **Required if type = script or service** | The entity for the `script` or `service` call |
+
+### Data Object
+| Name | Type | Required | Description | Default |
+| ---- | ---- | -------- | ----------- | ------- |
+| temperature | number | **Required if type = temperature** | The target temperature |
+| hvac_mode | string | **Required if type = hvac_mode** | The HVAC mode |
+| preset_mode | string | **Required if type = preset_mode** | The preset mode |
+| *any* | any | **Optional** | Extra data for the `script` or `service` types |
 
 ## Configuration (Installation throug HACS)
 
@@ -76,11 +86,17 @@ HACS compatible
   entity: climate.main_thermostat
   layout:
     preset_buttons:
-      - temperature: 16
-        name: ECO
-      - temperature: 20
-        name: Default
-      - temperature: 22
+      - type: temperature
+        data:
+          temperature: 16
+        label: ECO
+      - type: temperature
+        data:
+          temperature: 20
+        label: Default
+      - type: temperature
+        data:
+          temperature: 22
         icon: hass:fire
 
 - type: entities
