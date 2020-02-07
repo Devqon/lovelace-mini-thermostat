@@ -5,6 +5,7 @@ export interface CardConfig {
   layout?: CardLayoutConfig;
   icons?: { [key: string]: string };
   labels?: { [key: string]: string };
+  step_size?: number;
 }
 
 export interface CardLayoutConfig {
@@ -17,10 +18,19 @@ export interface CardLayoutConfig {
 }
 
 export interface PresetButtonConfig {
-  temperature: number;
+  type: 'temperature' | 'hvac_mode' | 'preset_mode' | 'script' | 'service';
+  data: PresetButtonData;
   icon?: string;
-  name?: string;
-  show_temperature?: boolean;
+  label?: string;
+  entity?: string; // for script | service
+}
+
+export interface PresetButtonData {
+  temperature?: number;
+  hvac_mode?: string;
+  preset_mode?: string;
+  // for script | service data
+  [key: string]: any;
 }
 
 export interface Values {

@@ -4,7 +4,6 @@ import {
   customElement,
   CSSResult,
   TemplateResult,
-  css,
   PropertyValues,
   PropertyDeclarations,
 } from 'lit-element';
@@ -14,7 +13,8 @@ import { HassEntity } from 'home-assistant-js-websocket';
 import debounce from 'debounce-fn';
 
 import { CardConfig, Values, PresetButtonConfig } from './types';
-import { CARD_VERSION } from './const';
+import { CARD_VERSION, CURRENT_HVAC_IDLE, CURRENT_HVAC_OFF } from './const';
+import styles from './styles';
 
 import { localize } from './localize/localize';
 
@@ -28,10 +28,12 @@ console.info(
 const UPDATE_PROPS = ['_values', 'entity', '_updating', 'unit'];
 const ICONS = {
   default: 'hass:thermometer',
+  cool: 'hass:snowflake',
   heat: 'hass:fire',
   up: 'mdi:chevron-up',
   down: 'mdi:chevron-down',
 };
+const DEFAULT_STEP_SIZE = 0.5;
 
 @customElement('mini-thermostat')
 export class MiniThermostatCard extends LitElement {
@@ -89,11 +91,11 @@ export class MiniThermostatCard extends LitElement {
   }
 
   set hass(hass: HomeAssistant) {
+    this._hass = hass;
+
     if (!this.config) return;
     const entity = hass.states[this.config.entity];
     if (!entity) return;
-
-    this._hass = hass;
     this.entity = entity;
 
     const values: Values = {
@@ -109,23 +111,38 @@ export class MiniThermostatCard extends LitElement {
   }
 
   private _validateConfig(config: CardConfig): void {
+    const throwError = (error: string) => {
+      throw new Error(error);
+    };
     if (!config || !config.entity) {
-      throw new Error(localize('common.config.entity'));
+      throwError(localize('common.config.entity'));
     }
     if (config.layout) {
       if (config.layout.dropdown) {
         if (config.layout.dropdown !== 'hvac_modes' && config.layout.dropdown !== 'preset_modes') {
-          throw new Error(localize('common.config.dropdown'));
+          throwError(localize('common.config.dropdown'));
         }
       }
       if (config.layout.preset_buttons) {
         if (!Array.isArray(config.layout.preset_buttons)) {
           if (config.layout.preset_buttons !== 'hvac_modes' && config.layout.preset_buttons !== 'preset_modes')
-            throw new Error('Invalid configuration for preset_buttons');
+            throwError('Invalid configuration for preset_buttons');
         } else {
           config.layout.preset_buttons.forEach(button => {
-            if (typeof button.temperature !== 'number') {
-              throw new Error('Temperature should be a number');
+            if (!button.data) {
+              throwError('Missing option: data');
+            }
+            if (button.type === 'temperature' && typeof button.data.temperature !== 'number') {
+              throwError('Temperature should be a number');
+            }
+            if (button.type === 'hvac_mode' && !button.data.hvac_mode) {
+              throwError('Missing option: data.hvac_mode');
+            }
+            if (button.type === 'preset_mode' && !button.data.preset_mode) {
+              throwError('Missing option: data.preset_mode');
+            }
+            if ((button.type === 'script' || button.type === 'service') && !button.entity) {
+              throwError('Missing option: entity');
             }
           });
         }
@@ -147,7 +164,6 @@ export class MiniThermostatCard extends LitElement {
     return this._hass?.localize(name) || fallback;
   }
 
-  // config helpers
   private shouldRenderUpDown() {
     return this.config!.layout?.up_down !== false;
   }
@@ -172,10 +188,9 @@ export class MiniThermostatCard extends LitElement {
     return html`
       <ha-card
         class="${this._computeClasses()}"
-        .grouped="${this.config!.layout?.grouped}"
         tabindex="0"
-        aria-label=${`MiniThermostat: ${this.config.entity}`}
-        .header=${this.config!.name}
+        aria-label="${`MiniThermostat: ${this.config.entity}`}"
+        .header="${this.config!.name}"
       >
         <div class="flex-box">
           <div class="state">
@@ -192,7 +207,7 @@ export class MiniThermostatCard extends LitElement {
 
   private _renderState() {
     const relativeState = this._getRelativeState(this.entity);
-    const stateIcon = relativeState === 'under' ? 'heat' : 'default';
+    const stateIcon = relativeState === 'under' ? 'heat' : relativeState === 'above' ? 'cool' : 'default';
     const currentTemperature = this.entity!.attributes.current_temperature;
     return html`
       <mwc-button dense @click="${() => this._showEntityMoreInfo()}" class="state-${relativeState}">
@@ -203,7 +218,7 @@ export class MiniThermostatCard extends LitElement {
   }
 
   private _renderMiddle() {
-    if (!this.config!.layout) return '';
+    if (!this.config?.layout) return '';
 
     const middle: any[] = [];
     if (this.config!.layout.name) {
@@ -228,9 +243,9 @@ export class MiniThermostatCard extends LitElement {
 
   private _renderDropdown(dropdown: string) {
     if (dropdown === 'hvac_modes') {
-      return this._renderHvacModes();
+      return this._renderHvacModesDropdown();
     } else if (dropdown === 'preset_modes') {
-      return this._renderPresetModes();
+      return this._renderPresetModesDropdown();
     }
     return '';
   }
@@ -243,7 +258,7 @@ export class MiniThermostatCard extends LitElement {
     `;
   }
 
-  private _renderHvacModes() {
+  private _renderHvacModesDropdown() {
     if (!this.entity!.attributes.hvac_modes) return '';
 
     const modes = this.entity!.attributes.hvac_modes;
@@ -253,7 +268,7 @@ export class MiniThermostatCard extends LitElement {
     return this._renderListbox(modes, currentMode, localizationKey, 'hvac_mode');
   }
 
-  private _renderPresetModes() {
+  private _renderPresetModesDropdown() {
     if (!this.entity!.attributes.preset_mode) return '';
 
     if (!this.entity!.attributes.preset_modes) return this.entity!.attributes.preset_mode;
@@ -287,14 +302,12 @@ export class MiniThermostatCard extends LitElement {
   }
 
   private _renderPresetButtons({ config, entity } = this) {
-    if (!config || !config.layout || !config!.layout.preset_buttons || !entity) return '';
+    if (!config?.layout?.preset_buttons || !entity) return '';
 
-    let presetButtonsHtml;
     if (Array.isArray(config.layout.preset_buttons)) {
-      presetButtonsHtml = html`
-        ${config.layout.preset_buttons.map(button => this._renderSetTemperatureButton(button))}
+      return html`
+        ${config.layout.preset_buttons.map(button => this._renderPresetButton(button))}
       `;
-      return presetButtonsHtml;
     } else {
       if (config.layout.preset_buttons === 'preset_modes') {
         return html`
@@ -304,83 +317,105 @@ export class MiniThermostatCard extends LitElement {
         return html`
           ${entity.attributes.hvac_modes.map(mode => this._renderSetHvacModeButton(mode))}
         `;
+      } else {
+        return '';
       }
     }
   }
 
-  private _renderSetTemperatureButton(button: PresetButtonConfig) {
-    const isCurrentTargetTemperature = this.entity!.attributes.temperature === button.temperature;
-    return html`
-      <mwc-button
-        @click="${() => this._setTemperature(button.temperature)}"
-        dense
-        .raised="${isCurrentTargetTemperature}"
-        .outlined="${!isCurrentTargetTemperature}"
-      >
-        ${button.icon
-          ? html`
-              <ha-icon icon="${this._getIcon(button.icon)}"></ha-icon>
-            `
-          : button.name
-          ? button.name
-          : ''}
-        ${button.show_temperature ? this._toDisplayTemperature(button.temperature) : ''}
-      </mwc-button>
-    `;
+  private _renderPresetButton(button: PresetButtonConfig) {
+    switch (button.type) {
+      case 'temperature':
+        return this._renderSetTemperatureButton(button.data.temperature!, button.icon, button.label);
+      case 'hvac_mode':
+        return this._renderSetHvacModeButton(button.data.hvac_mode!, button.icon, button.label);
+      case 'preset_mode':
+        return this._renderSetPresetModeButton(button.data.preset_mode!, button.icon, button.label);
+      case 'script':
+        return this._renderScriptButton(button.entity!, button.data, button.icon, button.label);
+      case 'service':
+        return this._renderServiceButton(button.entity!, button.data, button.icon, button.label);
+      default:
+        return '';
+    }
   }
 
-  private _renderSetHvacModeButton(mode: string) {
+  private _renderSetTemperatureButton(temperature: number, icon?: string, label?: string) {
+    const isCurrentTargetTemperature = this.entity?.attributes.temperature === temperature;
+    const action = () => this._setTemperature(temperature);
+    if (!icon && !label) {
+      label = this._toDisplayTemperature(temperature);
+    }
+    return this._renderActionButton(action, isCurrentTargetTemperature, icon, label);
+  }
+
+  private _renderSetHvacModeButton(mode: string, icon?: string, label?: string) {
     const isCurrentHvacMode = this.entity!.state === mode;
-    return html`
-      <mwc-button
-        .raised="${isCurrentHvacMode}"
-        .outlined="${!isCurrentHvacMode}"
-        dense
-        @click="${() => this._setMode('hvac_mode', mode)}"
-      >
-        ${this._getLabel(`state.climate.${mode}`, mode)}
-      </mwc-button>
-    `;
+    const action = () => this._setMode('hvac_mode', mode);
+    if (!icon && !label) {
+      label = this._getLabel(`state.climate.${mode}`, mode);
+    }
+    return this._renderActionButton(action, isCurrentHvacMode, icon, label);
   }
 
-  private _renderSetPresetModeButton(mode: string) {
+  private _renderSetPresetModeButton(mode: string, icon?: string, label?: string) {
     const isCurrentPresetMode = this.entity!.attributes.preset_mode === mode;
+    const action = () => this._setMode('preset_mode', mode);
+    if (!icon && !label) {
+      label = this._getLabel(`state_attributes.climate.preset_mode.${mode}`, mode);
+    }
+    return this._renderActionButton(action, isCurrentPresetMode, icon, label);
+  }
+
+  private _renderScriptButton(entity: string, data: any, icon?: string, label?: string) {
+    const action = () => this._callScript(entity, data);
+    return this._renderActionButton(action, false, icon, label);
+  }
+
+  private _renderServiceButton(entity: string, data: any, icon?: string, label?: string) {
+    const action = () => this._callService(entity, data);
+    return this._renderActionButton(action, false, icon, label);
+  }
+
+  private _renderActionButton(action: () => any, active: boolean, icon?: string, label?: string) {
     return html`
-      <mwc-button
-        .raised="${isCurrentPresetMode}"
-        .outlined="${!isCurrentPresetMode}"
-        dense
-        @click="${() => this._setMode('preset_mode', mode)}"
-      >
-        ${this._getLabel(`state_attributes.climate.preset_mode.${mode}`, mode)}
+      <mwc-button dense .raised="${active}" .outlined="${!active}" @click="${action}">
+        ${icon
+          ? html`
+              <ha-icon icon="${this._getIcon(icon)}"></ha-icon>
+            `
+          : label}
       </mwc-button>
     `;
   }
 
-  private _renderTemperatureChangeButton(direction: 'up' | 'down') {
-    const change = direction === 'up' ? 0.5 : -0.5;
+  private _renderTemperatureChangeButton(change: number) {
+    const direction = change >= 0 ? 'up' : 'down';
     return html`
       <paper-icon-button
-        title="Temperature up"
+        title="Temperature ${direction}"
         class="change-arrow"
         icon="${this._getIcon(`${direction}`)}"
-        @click="${() => this._changeTemperature(change)}" class="action">
-      </<paper-icon-button>
+        @click="${() => this._changeTemperature(change)}"
+        class="action"
+      >
+      </paper-icon-button>
     `;
   }
 
   private _renderEnd({ temperature: targetTemperature } = this._values) {
     const upDown = this.shouldRenderUpDown();
+    const step_size = this.config!.step_size || DEFAULT_STEP_SIZE;
     return upDown
       ? html`
           <div class="actions flex-box">
-            ${this._renderTemperatureChangeButton('up')}
+            ${this._renderTemperatureChangeButton(+step_size)}
             <mwc-button dense @click="${() => this._showEntityMoreInfo()}">
               <span class="${this._updating ? 'updating' : ''}">
                 ${this._toDisplayTemperature(targetTemperature)}
               </span>
             </mwc-button>
-            ${this._renderTemperatureChangeButton('down')}
+            ${this._renderTemperatureChangeButton(-step_size)}
           </div>
         `
       : '';
@@ -410,31 +445,45 @@ export class MiniThermostatCard extends LitElement {
     this._debounceTemperature({ ...this._values });
   }
 
-  private _handleModeChanged(ev: CustomEvent, name: string, current: string): void {
+  private _callScript(entity: string, data: any): void {
+    this._hass!.callService('script', entity.split('.').pop()!, ...data);
+  }
+
+  private _callService(entity: string, data: any): void {
+    const [domain, service] = entity.split('.');
+    this._hass!.callService(domain, service, ...data);
+  }
+
+  private _handleModeChanged(ev: CustomEvent, modeType: string, current: string): void {
     const newVal = ev.detail.value;
     // prevent heating while in idle by checking for current
     if (newVal && newVal !== current) {
-      this._setMode(name, newVal);
+      this._setMode(modeType, newVal);
     }
   }
 
-  private _setMode(name: string, value: string) {
+  private _setMode(modeType: string, value: string) {
     const serviceData = {
       entity_id: this.config!.entity,
-      [name]: value,
+      [modeType]: value,
     };
-    this._hass!.callService('climate', `set_${name}`, serviceData);
+    this._hass!.callService('climate', `set_${modeType}`, serviceData);
   }
 
   private _getRelativeState(stateObj): string {
-    if (stateObj.state === 'off' || stateObj.attributes.temperature == null) {
+    const targetTemperature = stateObj.attributes.temperature;
+    if (stateObj.state === CURRENT_HVAC_OFF || stateObj.state === CURRENT_HVAC_IDLE || targetTemperature == null) {
       return 'inactive';
     }
-    if (stateObj.attributes.current_temperature < stateObj.attributes.temperature) {
+    const currentTemperature = stateObj.attributes.current_temperature;
+    if (currentTemperature < targetTemperature) {
       return 'under';
     }
-    if (stateObj.attributes.current_temperature >= stateObj.attributes.temperature) {
+    if (currentTemperature === targetTemperature) {
       return 'equal';
+    }
+    if (currentTemperature > targetTemperature) {
+      return 'above';
     }
     return 'neutral';
   }
@@ -457,91 +506,10 @@ export class MiniThermostatCard extends LitElement {
   }
 
   static get styles(): CSSResult {
-    return css`
-      :host {
-        --minith-default-spacing: 2px;
+    return styles;
+  }
 
-        --minith-default-inactive-color: inherit;
-        --minith-default-active-color: var(--paper-item-icon-color, #12d289);
-        --minith-default-warning-color: #fce588;
-      }
-      ha-card.no-header {
-        padding: calc(var(--minith-spacing, var(--minith-default-spacing)) * 4) 0;
-      }
-      ha-card.with-header .card-header {
-        padding: 0 24px;
-      }
-      ha-card.grouped {
-        box-shadow: none;
-        padding: 0;
-      }
-      ha-card.grouped .state {
-        padding-left: 0;
-        width: 104px;
-      }
-      ha-card.grouped .state mwc-button {
-        padding-left: 0;
-      }
-      ha-card.grouped mwc-button {
-        padding-top: 0;
-        padding-bottom: 0;
-      }
-      ha-card.tiny {
-        padding: 0;
-      }
-      .flex-box {
-        display: flex;
-        justify-content: space-between;
-      }
-      .container-middle {
-        display: flex;
-        align-items: center;
-      }
-      .container-middle ha-paper-dropdown-menu {
-        max-width: 150px;
-      }
-      .actions {
-        display: flex;
-        justify-content: flex-end;
-      }
-      .actions paper-icon-button {
-        height: 100%;
-      }
-      .actions mwc-button {
-        width: 30px;
-        display: flex;
-        justify-content: center;
-      }
-      .updating {
-        color: var(--minith-warning-color, var(--minith-default-warning-color));
-      }
-      mwc-button {
-        cursor: pointer;
-        padding: 8px;
-        position: relative;
-        display: inline-flex;
-        align-items: center;
-      }
-      mwc-button.action {
-        min-width: 30px;
-        display: flex;
-        justify-content: center;
-      }
-      .state-inactive {
-        color: var(--minit-inactive-color, var(--minith-default-inactive-color));
-      }
-      .state-equal {
-        color: var(--minith-active-color, var(--minith-default-active-color));
-      }
-      .state-under {
-        color: var(--minith-warning-color, var(--minith-default-warning-color));
-      }
-      .warning {
-        display: block;
-        color: black;
-        background-color: var(--minith-warning-color, var(--minith-default-warning-color));
-        padding: 8px;
-      }
-    `;
+  getCardSize() {
+    return 1;
   }
 }
