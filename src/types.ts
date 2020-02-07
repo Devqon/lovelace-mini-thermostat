@@ -1,3 +1,5 @@
+import { ActionConfig } from "custom-card-helpers";
+
 export interface CardConfig {
   type: string;
   entity: string;
@@ -6,6 +8,9 @@ export interface CardConfig {
   icons?: { [key: string]: string };
   labels?: { [key: string]: string };
   step_size?: number;
+  tap_action?: ActionConfig;
+  hold_action?: ActionConfig;
+  double_tap_action?: ActionConfig;
 }
 
 export interface CardLayoutConfig {
