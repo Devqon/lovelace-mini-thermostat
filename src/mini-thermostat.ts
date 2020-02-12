@@ -8,12 +8,13 @@ import {
   PropertyDeclarations,
 } from 'lit-element';
 import { classMap } from 'lit-html/directives/class-map';
-import { HomeAssistant } from 'custom-card-helpers';
+import { HomeAssistant, hasAction, ActionHandlerEvent, handleAction } from 'custom-card-helpers';
 import { HassEntity } from 'home-assistant-js-websocket';
 import debounce from 'debounce-fn';
 
 import { CardConfig, Values, PresetButtonConfig } from './types';
 import { CARD_VERSION, CURRENT_HVAC_IDLE, CURRENT_HVAC_OFF } from './const';
+import { actionHandler } from './action-handler-directive';
 import styles from './styles';
 
 import { localize } from './localize/localize';
@@ -61,13 +62,13 @@ export class MiniThermostatCard extends LitElement {
 
   private _debounceTemperature = debounce(
     (values: Values) => {
-      if (!this.config!.entity || !this._hass) return;
+      if (!this.config!.entity || !this.hass) return;
 
       const details = {
         entity_id: this.config!.entity,
         ...values,
       };
-      this._hass.callService('climate', 'set_temperature', details);
+      this.hass.callService('climate', 'set_temperature', details);
     },
     {
       wait: 2000,
@@ -108,6 +109,10 @@ export class MiniThermostatCard extends LitElement {
     }
 
     this.unit = hass.config.unit_system.temperature;
+  }
+
+  get hass() {
+    return this._hass!;
   }
 
   private _validateConfig(config: CardConfig): void {
@@ -161,7 +166,7 @@ export class MiniThermostatCard extends LitElement {
     if (this.config?.labels && this.config.labels[name]) {
       return this.config.labels[name];
     }
-    return this._hass?.localize(name) || fallback;
+    return this.hass.localize(name) || fallback;
   }
 
   private shouldRenderUpDown() {
@@ -173,7 +178,7 @@ export class MiniThermostatCard extends LitElement {
   }
 
   protected render(): TemplateResult | void {
-    if (!this.config || !this._hass) {
+    if (!this.config || !this.hass) {
       return html``;
     }
 
@@ -210,7 +215,16 @@ export class MiniThermostatCard extends LitElement {
     const stateIcon = relativeState === 'under' ? 'heat' : relativeState === 'above' ? 'cool' : 'default';
     const currentTemperature = this.entity!.attributes.current_temperature;
     return html`
-      <mwc-button dense @click="${() => this._showEntityMoreInfo()}" class="state-${relativeState}">
+      <mwc-button
+        dense
+        class="state-${relativeState}"
+        @action=${this._handleAction}
+        .actionHandler=${actionHandler({
+          hasHold: hasAction(this.config!.hold_action),
+          hasDoubleTap: hasAction(this.config!.double_tap_action),
+          repeat: this.config!.hold_action ? this.config!.hold_action.repeat : undefined,
+        })}
+      >
         <ha-icon icon="${this._getIcon(stateIcon)}"></ha-icon>
         ${this._toDisplayTemperature(currentTemperature)}
       </mwc-button>
@@ -426,7 +440,7 @@ export class MiniThermostatCard extends LitElement {
   }
 
   private _changeTemperature(change): void {
-    if (!this._hass || !this.config) {
+    if (!this.hass || !this.config) {
       return;
     }
     const currentTarget = this._values.temperature;
@@ -434,7 +448,7 @@ export class MiniThermostatCard extends LitElement {
   }
 
   private _setTemperature(temperature): void {
-    if (!this._hass || !this.config) {
+    if (!this.hass || !this.config) {
       return;
     }
     this._updating = true;
@@ -446,12 +460,16 @@ export class MiniThermostatCard extends LitElement {
   }
 
   private _callScript(entity: string, data: any): void {
-    this._hass!.callService('script', entity.split('.').pop()!, ...data);
+    const split = entity.split('.');
+    if (!split || !split.length) {
+      return;
+    }
+    this.hass.callService('script', split.pop(), ...data);
   }
 
   private _callService(entity: string, data: any): void {
     const [domain, service] = entity.split('.');
-    this._hass!.callService(domain, service, ...data);
+    this.hass.callService(domain, service, ...data);
   }
 
   private _handleModeChanged(ev: CustomEvent, modeType: string, current: string): void {
@@ -462,17 +480,23 @@ export class MiniThermostatCard extends LitElement {
     }
   }
 
-  private _setMode(modeType: string, value: string) {
+  private _setMode(modeType: string, value: string): void {
     const serviceData = {
       entity_id: this.config!.entity,
       [modeType]: value,
     };
-    this._hass!.callService('climate', `set_${modeType}`, serviceData);
+    this.hass.callService('climate', `set_${modeType}`, serviceData);
   }
 
   private _getRelativeState(stateObj): string {
     const targetTemperature = stateObj.attributes.temperature;
-    if (stateObj.state === CURRENT_HVAC_OFF || stateObj.state === CURRENT_HVAC_IDLE || targetTemperature == null) {
+    if (
+      stateObj.state === CURRENT_HVAC_OFF ||
+      stateObj.state === CURRENT_HVAC_IDLE ||
+      targetTemperature == null ||
+      stateObj.attributes.hvac_action === CURRENT_HVAC_OFF ||
+      stateObj.attributes.hvac_action === CURRENT_HVAC_IDLE
+    ) {
       return 'inactive';
     }
     const currentTemperature = stateObj.attributes.current_temperature;
@@ -486,6 +510,12 @@ export class MiniThermostatCard extends LitElement {
       return 'above';
     }
     return 'neutral';
+  }
+
+  private _handleAction(ev: ActionHandlerEvent): void {
+    if (this.hass && this.config && ev.detail.action) {
+      handleAction(this, this.hass, this.config, ev.detail.action);
+    }
   }
 
   private _showEntityMoreInfo({ entity } = this.config!): void {
@@ -509,7 +539,7 @@ export class MiniThermostatCard extends LitElement {
     return styles;
   }
 
-  getCardSize() {
+  getCardSize(): number {
     return 1;
   }
 }

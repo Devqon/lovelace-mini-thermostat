@@ -34,6 +34,9 @@ HACS compatible
 | icons    | Object | **Optional** | Mapping for overriding icons |
 | labels   | Object | **Optional** | Mapping for overriding labels |
 | step_size | number | **Optional** | Stepsize for the up/down buttons | 0.5 |
+| tap_action | Object | **Optional** | The action to perform when tapping the state. See [tap_action](https://www.home-assistant.io/lovelace/entity-button/#tap_action) | more-info |
+| hold_action | Object | **Optional** | The action to perform when holding the state. See [hold_action](https://www.home-assistant.io/lovelace/entity-button/#hold_action) | more-info |
+| double_tap_action | Object | **Optional** | The action to perform when double tapping the state. See [double_tap_action](https://www.home-assistant.io/lovelace/entity-button/#double_tap_action) | more-info |
 
 ### Layout Object
 | Name | Type | Required | Description | Default |
