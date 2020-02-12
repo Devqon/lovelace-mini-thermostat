@@ -78,7 +78,9 @@ HACS compatible
 - type: custom:mini-thermostat
   entity: climate.main_thermostat
   layout:
-    dropdown: 'hvac_modes'
+    dropdown: 'preset_modes'
+  labels:
+    'state_attributes.climate.preset_mode.Away and Eco': 'E&A'
 
 - type: custom:mini-thermostat
   entity: climate.main_thermostat
@@ -97,10 +99,11 @@ HACS compatible
         data:
           temperature: 20
         label: Default
-      - type: temperature
+      - type: service
+        entity: scene.turn_on
+        label: Hot
         data:
-          temperature: 22
-        icon: hass:fire
+          entity_id: scene.make_it_melting
 
 - type: entities
   entities:

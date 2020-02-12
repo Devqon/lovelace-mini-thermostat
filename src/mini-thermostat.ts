@@ -460,11 +460,11 @@ export class MiniThermostatCard extends LitElement {
   }
 
   private _callScript(entity: string, data: any): void {
-    const split = entity.split('.');
+    const split = entity.split('.')?.pop();
     if (!split || !split.length) {
       return;
     }
-    this.hass.callService('script', split.pop(), ...data);
+    this.hass.callService('script', split, ...data);
   }
 
   private _callService(entity: string, data: any): void {

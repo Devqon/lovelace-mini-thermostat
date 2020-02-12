@@ -1,4 +1,4 @@
-export const CARD_VERSION = '1.0.0';
+export const CARD_VERSION = '1.1.0';
 
 // All activity disabled / Device is off/standby
 export const HVAC_MODE_OFF = 'off';
