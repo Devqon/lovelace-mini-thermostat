@@ -196,12 +196,6 @@ export class MiniThermostatCard extends LitElement {
         tabindex="0"
         aria-label="${`MiniThermostat: ${this.config.entity}`}"
         .header="${this.config!.name}"
-        @action=${this._handleAction}
-        .actionHandler=${actionHandler({
-          hasHold: hasAction(this.config.hold_action),
-          hasDoubleTap: hasAction(this.config.double_tap_action),
-          repeat: this.config.hold_action ? this.config.hold_action.repeat : undefined,
-        })}
       >
         <div class="flex-box">
           <div class="state">
@@ -221,7 +215,16 @@ export class MiniThermostatCard extends LitElement {
     const stateIcon = relativeState === 'under' ? 'heat' : relativeState === 'above' ? 'cool' : 'default';
     const currentTemperature = this.entity!.attributes.current_temperature;
     return html`
-      <mwc-button dense @click="${() => this._showEntityMoreInfo()}" class="state-${relativeState}">
+      <mwc-button
+        dense
+        class="state-${relativeState}"
+        @action=${this._handleAction}
+        .actionHandler=${actionHandler({
+          hasHold: hasAction(this.config!.hold_action),
+          hasDoubleTap: hasAction(this.config!.double_tap_action),
+          repeat: this.config!.hold_action ? this.config!.hold_action.repeat : undefined,
+        })}
+      >
         <ha-icon icon="${this._getIcon(stateIcon)}"></ha-icon>
         ${this._toDisplayTemperature(currentTemperature)}
       </mwc-button>
@@ -457,7 +460,11 @@ export class MiniThermostatCard extends LitElement {
   }
 
   private _callScript(entity: string, data: any): void {
-    this.hass.callService('script', entity.split('.').pop()!, ...data);
+    const split = entity.split('.');
+    if (!split || !split.length) {
+      return;
+    }
+    this.hass.callService('script', split.pop(), ...data);
   }
 
   private _callService(entity: string, data: any): void {
@@ -473,7 +480,7 @@ export class MiniThermostatCard extends LitElement {
     }
   }
 
-  private _setMode(modeType: string, value: string) {
+  private _setMode(modeType: string, value: string): void {
     const serviceData = {
       entity_id: this.config!.entity,
       [modeType]: value,
@@ -483,7 +490,13 @@ export class MiniThermostatCard extends LitElement {
 
   private _getRelativeState(stateObj): string {
     const targetTemperature = stateObj.attributes.temperature;
-    if (stateObj.state === CURRENT_HVAC_OFF || stateObj.state === CURRENT_HVAC_IDLE || targetTemperature == null) {
+    if (
+      stateObj.state === CURRENT_HVAC_OFF ||
+      stateObj.state === CURRENT_HVAC_IDLE ||
+      targetTemperature == null ||
+      stateObj.attributes.hvac_action === CURRENT_HVAC_OFF ||
+      stateObj.attributes.hvac_action === CURRENT_HVAC_IDLE
+    ) {
       return 'inactive';
     }
     const currentTemperature = stateObj.attributes.current_temperature;
@@ -526,7 +539,7 @@ export class MiniThermostatCard extends LitElement {
     return styles;
   }
 
-  getCardSize() {
+  getCardSize(): number {
     return 1;
   }
 }
