@@ -47,7 +47,7 @@ export default css`
     display: flex;
     justify-content: flex-end;
   }
-  .actions paper-icon-button {
+  .actions ha-icon-button {
     height: 100%;
   }
   .actions mwc-button {
