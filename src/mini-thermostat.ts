@@ -406,14 +406,14 @@ export class MiniThermostatCard extends LitElement {
   private _renderTemperatureChangeButton(change: number) {
     const direction = change >= 0 ? 'up' : 'down';
     return html`
-      <paper-icon-button
+      <ha-icon-button
         title="Temperature ${direction}"
         class="change-arrow"
         icon="${this._getIcon(`${direction}`)}"
         @click="${() => this._changeTemperature(change)}"
         class="action"
       >
-      </paper-icon-button>
+      </ha-icon-button>
     `;
   }
 
