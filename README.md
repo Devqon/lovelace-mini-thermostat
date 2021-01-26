@@ -1,3 +1,6 @@
+# ABANDONED
+## This repository is not in active development. Please consider to use https://github.com/artem-sedykh/mini-climate-card instead
+
 # Mini Thermostat Card by [@devqon](https://www.github.com/Devqon)
 
 A small lovelace card for controlling a thermostat
